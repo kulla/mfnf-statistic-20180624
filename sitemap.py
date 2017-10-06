@@ -5,10 +5,26 @@ Copyright 2017 Stephan Kulla
 
 import re
 
-from mfnf.utils import remove_prefix, lookup
+from functools import reduce
 
-SITEMAP_NODE_TYPES = ["mfnf_sitemap", "book", "chapter", "article"]
-SITEMAP_DELIMITER = "= Bücher ="
+SITEMAP_NODE_TYPES = ["mfnf_sitemap", "book", "chapter", "article", "article"]
+
+def query_path(obj, path):
+    return reduce(lambda x, y: y(x) if callable(y) else x[y], path, obj)
+
+def lookup(obj, *path):
+    """Lookups repeatedly the items in the list `path` of the object `obj`. In
+    case any `IndexError` or `KeyError` is thrown, `None` is returned. For
+    example the call `safe_lookup(obj, "a", 0, "b")` returns
+    `obj["a"][0]["b"]` when it exists and `None` otherwise."""
+    try:
+        return query_path(obj, path)
+    except (IndexError, KeyError, TypeError):
+        return None
+
+def remove_prefix(text, prefix):
+    """Removes the prefix `prefix` from string `text` in case it is present."""
+    return text[len(prefix):] if text.startswith(prefix) else text
 
 def generate_sitemap_nodes(sitemap_text):
     """Generator for all node specifications in a sitemap source code. It
@@ -118,10 +134,9 @@ def parse_sitemap(sitemap_text):
     """
     root = {"children":[], "depth":0, "code": "Mathe für Nicht-Freaks"}
 
-    (introduction, separator, stripped_sitemap_text) = sitemap_text.partition(SITEMAP_DELIMITER)
     last_node = None
 
-    for node in generate_sitemap_nodes(stripped_sitemap_text):
+    for node in generate_sitemap_nodes(sitemap_text):
         if lookup(node, "type") == "exclude":
             assert last_node
 
